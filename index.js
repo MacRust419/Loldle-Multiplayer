@@ -1,6 +1,12 @@
 const fs = require('fs');
 require('dotenv').config();
 
+const prism = require("prism-media");
+const ffmpeg = require("ffmpeg-static");
+prism.FFmpeg.getInfo = () => ({
+    command: ffmpeg
+});
+
 const {
     Client,
     GatewayIntentBits,
