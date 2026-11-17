@@ -9,6 +9,7 @@ prism.FFmpeg.getInfo = () => ({
 
 const {
     Client,
+    ChannelType,
     GatewayIntentBits,
     SlashCommandBuilder,
     REST,
@@ -19,7 +20,6 @@ const {
     joinVoiceChannel,
     createAudioPlayer,
     createAudioResource,
-    AudioPlayerStatus,
     VoiceConnectionStatus,
     StreamType,
     entersState
@@ -56,6 +56,14 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
+const missingConfig = ["TOKEN", "CLIENT_ID", "GUILD_ID"]
+    .filter(name => !process.env[name]);
+
+if (missingConfig.length) {
+    console.error(`Missing required environment variables: ${missingConfig.join(", ")}`);
+    process.exit(1);
+}
+
 const champions = require('./data/champions.json');
 const SETTINGS_FILE = "./data/settings.json";
 let settings = fs.existsSync(SETTINGS_FILE)
@@ -74,8 +82,6 @@ setInterval(() => {
     console.log("Active player list cleared (1h reset)");
 }, 60 * 60 * 1000);
 
-/* -------------------- helpers -------------------- */
-
 function addActivePlayer(userId) {
     activePlayers.add(userId);
 }
@@ -83,8 +89,6 @@ function addActivePlayer(userId) {
 function saveSettings() {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
-
-/* -------------------- commands -------------------- */
 
 const commands = [
     new SlashCommandBuilder()
@@ -210,8 +214,6 @@ const commands = [
         .setDescription('Give hints')
 ].map(c => c.toJSON());
 
-/* -------------------- discord client -------------------- */
-
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates]
 });
@@ -219,11 +221,8 @@ client.once('clientReady', () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-/* -------------------- interactions -------------------- */
-
 client.on('interactionCreate', async interaction => {
 
-    /* autocomplete */
     if (interaction.isAutocomplete()) {
 
         const focused = interaction.options.getFocused().toLowerCase();
@@ -245,17 +244,15 @@ client.on('interactionCreate', async interaction => {
 
     const channelId = interaction.channelId;
 
-    /* START GAME */
     if (interaction.commandName === 'loldle') {
 
         const mode = interaction.options.getSubcommand();
-        const channelId = interaction.channelId;
 
         if (mode === 'setchannel') {
 
             const channel = interaction.options.getChannel('channel');
 
-            if (!channel || channel.type !== 2) {
+            if (!channel || channel.type !== ChannelType.GuildVoice) {
                 return interaction.reply({
                     content: 'Select a valid voice channel.',
                     ephemeral: true
@@ -537,10 +534,8 @@ client.on('interactionCreate', async interaction => {
             activeGames.set(interaction.channelId, {
                 mode: "quote",
                 answer,
-                quote: quoteData.text,
                 audio: quoteData.audio,
                 hintLevel: 0,
-                usedHints: [],
                 guesses: new Set(),
                 ffVotes: new Set(),
                 hostId: interaction.user.id
@@ -583,12 +578,19 @@ client.on('interactionCreate', async interaction => {
                     Math.random() * 360
                 );
 
-            const image =
-                await createAbilityImage(
-                    ability.url,
-                    0,
-                    rotation
-                );
+            let image;
+
+            try {
+                image = await createAbilityImage(ability.url, 0, rotation);
+            } catch (error) {
+                activeGames.delete(channelId);
+                console.error("Failed to load ability image:", error);
+
+                return interaction.editReply({
+                    content: "Could not load the ability image. Try again.",
+                    ephemeral: true
+                });
+            }
 
             activeGames.set(channelId, {
                 mode: "ability",
@@ -612,27 +614,34 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (mode === 'skin') {
+            await interaction.deferReply();
+
             if (activeGames.has(channelId)) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: 'Game already running in this channel.',
+                    ephemeral: true
+                });
+            }
+
+            const answer = randomChampion();
+            const skin = randomSkin(answer);
+            const { size, forbidden } = getSkinHintConfig(0);
+            let image;
+
+            try {
+                image = await createSkinImage(skin.url, size, forbidden);
+            } catch (error) {
+                console.error("Failed to load skin image:", error);
+
+                return interaction.editReply({
+                    content: "Could not load the skin image. Try again.",
                     ephemeral: true
                 });
             }
 
             addActivePlayer(interaction.user.id);
 
-            const answer = randomChampion();
-            const skin = randomSkin(answer);
-
-            const { size, forbidden } = getSkinHintConfig(0);
-
-            const image = await createSkinImage(
-                skin.url,
-                size,
-                forbidden
-            );
-
-            activeGames.set(interaction.channelId, {
+            activeGames.set(channelId, {
                 mode: "skin",
                 answer,
                 skin,
@@ -642,8 +651,8 @@ client.on('interactionCreate', async interaction => {
                 hostId: interaction.user.id
             });
 
-            return interaction.reply({
-                content: "Skin mode started. Guess the skin with /g.",
+            return interaction.editReply({
+                content: "Skin mode started. Guess the champion with /g.",
                 files: [{
                     attachment: image,
                     name: "skin.png"
@@ -653,7 +662,6 @@ client.on('interactionCreate', async interaction => {
 
     }
 
-    /* GIVE UP */
     if (interaction.commandName === 'ff') {
 
         const game = activeGames.get(channelId);
@@ -718,7 +726,6 @@ client.on('interactionCreate', async interaction => {
         );
     }
 
-    //HINT
     if (interaction.commandName === 'hint') {
 
         await interaction.deferReply();
@@ -755,7 +762,7 @@ client.on('interactionCreate', async interaction => {
 
             const channel = await guild.channels.fetch(voiceChannelId);
 
-            if (!channel || channel.type !== 2) {
+            if (!channel || channel.type !== ChannelType.GuildVoice) {
                 return interaction.editReply({
                     content: "Configured voice channel is invalid.",
                     ephemeral: true
@@ -916,7 +923,6 @@ client.on('interactionCreate', async interaction => {
         })
     }
 
-    /* GUESS */
     if (interaction.commandName === 'g') {
 
         const game = activeGames.get(channelId);
@@ -951,7 +957,6 @@ client.on('interactionCreate', async interaction => {
 
 
             recordWin(
-                interaction.guild,
                 game.mode,
                 interaction.user.id,
                 [...activePlayers]
@@ -996,8 +1001,6 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply(result);
     }
 });
-
-/* -------------------- deploy + login -------------------- */
 
 async function registerCommands() {
     const rest = new REST({ version: '10' }).setToken(TOKEN);

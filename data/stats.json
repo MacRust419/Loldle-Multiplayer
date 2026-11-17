@@ -6,20 +6,20 @@
         "wins": 1
       },
       "quote": {
-        "played": 0,
-        "wins": 0
+        "played": 5,
+        "wins": 5
       },
       "sound": {
         "played": 0,
         "wins": 0
       },
       "ability": {
-        "played": 3,
-        "wins": 3
+        "played": 6,
+        "wins": 6
       },
       "skin": {
-        "played": 10,
-        "wins": 10
+        "played": 14,
+        "wins": 14
       }
     },
     "multi": {
@@ -28,8 +28,8 @@
         "wins": 0
       },
       "quote": {
-        "played": 3,
-        "wins": 0
+        "played": 4,
+        "wins": 1
       },
       "sound": {
         "played": 0,
@@ -40,8 +40,8 @@
         "wins": 0
       },
       "skin": {
-        "played": 33,
-        "wins": 11
+        "played": 55,
+        "wins": 20
       }
     }
   },
@@ -64,8 +64,8 @@
         "wins": 1
       },
       "skin": {
-        "played": 38,
-        "wins": 38
+        "played": 42,
+        "wins": 42
       }
     },
     "multi": {
@@ -86,8 +86,8 @@
         "wins": 0
       },
       "skin": {
-        "played": 124,
-        "wins": 49
+        "played": 145,
+        "wins": 57
       }
     }
   },
@@ -110,8 +110,8 @@
         "wins": 0
       },
       "skin": {
-        "played": 55,
-        "wins": 55
+        "played": 68,
+        "wins": 68
       }
     },
     "multi": {
@@ -120,7 +120,7 @@
         "wins": 0
       },
       "quote": {
-        "played": 3,
+        "played": 4,
         "wins": 3
       },
       "sound": {
@@ -132,8 +132,8 @@
         "wins": 0
       },
       "skin": {
-        "played": 146,
-        "wins": 85
+        "played": 153,
+        "wins": 90
       }
     }
   },
@@ -224,7 +224,7 @@
         "wins": 0
       },
       "skin": {
-        "played": 18,
+        "played": 20,
         "wins": 0
       }
     }
@@ -364,6 +364,44 @@
       "skin": {
         "played": 42,
         "wins": 7
+      }
+    }
+  },
+  "986261630121824287": {
+    "single": {
+      "classic": {
+        "played": 0,
+        "wins": 0
+      },
+      "quote": {
+        "played": 0,
+        "wins": 0
+      },
+      "ability": {
+        "played": 0,
+        "wins": 0
+      },
+      "skin": {
+        "played": 0,
+        "wins": 0
+      }
+    },
+    "multi": {
+      "classic": {
+        "played": 0,
+        "wins": 0
+      },
+      "quote": {
+        "played": 0,
+        "wins": 0
+      },
+      "ability": {
+        "played": 0,
+        "wins": 0
+      },
+      "skin": {
+        "played": 4,
+        "wins": 0
       }
     }
   }

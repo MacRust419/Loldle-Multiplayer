@@ -1,1 +1,0 @@
-champions.json https://github.com/Kerrders/LoLdleData

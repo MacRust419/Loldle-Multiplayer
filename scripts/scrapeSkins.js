@@ -21,7 +21,7 @@ async function versionExists(version) {
 
 async function findNewestVersion() {
 
-    const VERSION = "16.13.1";
+    const VERSION = "16.19.1";
 
     let [major, minor] =
         VERSION
