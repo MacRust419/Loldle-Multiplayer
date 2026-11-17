@@ -1,100 +1,87 @@
-Loldle
+# Loldle
 
-A Discord bot for League of Legends champion guessing games. It includes Classic, Ability, Quote, and Skin modes, along with player statistics and leaderboards.
+A Discord bot for League of Legends champion-guessing games. It includes Classic, Ability, Quote, and Skin modes, along with player statistics and leaderboards.
 
-Requirements
+## Requirements
 
-Node.js 22.12.0 or newer
+- Node.js 22.12.0 or newer
+- A Discord application and bot
+- A Discord server where you can add the bot
 
-A Discord application and bot
+## Setup
 
-A Discord server where you can add the bot
+1. Clone or download the project.
+2. Install the dependencies:
 
-Setup
-
-Clone or download the project.
-
-Install the dependencies:
-
-```bash
+   ```bash
    npm install
    ```
 
-Copy `.env.example` to `.env` and fill in the three values:
+3. Copy `.env.example` to `.env` and fill in the required values:
 
-```env
-   TOKEN=your\\\\\\\\\\\\\\\_discord\\\\\\\\\\\\\\\_bot\\\\\\\\\\\\\\\_token
-   CLIENT\\\\\\\\\\\\\\\_ID=your\\\\\\\\\\\\\\\_discord\\\\\\\\\\\\\\\_application\\\\\\\\\\\\\\\_id
-   GUILD\\\\\\\\\\\\\\\_ID=your\\\\\\\\\\\\\\\_discord\\\\\\\\\\\\\\\_server\\\\\\\\\\\\\\\_id
+   ```env
+   TOKEN=your_discord_bot_token
+   CLIENT_ID=your_discord_application_id
+   GUILD_ID=your_discord_server_id
    ```
 
-In the Discord Developer Portal, enable the `bot` and `applications.commands` OAuth2 scopes and add the bot to your server. The bot needs permission to view channels, send messages, and attach files. It also needs Connect and Speak to play Quote mode audio.
+4. In the Discord Developer Portal, enable the `bot` and `applications.commands` OAuth2 scopes, then add the bot to your server. The bot needs permission to view channels, send messages, and attach files. It also needs the Connect and Speak permissions to play Quote mode audio.
+5. Start the bot:
 
-Start the bot:
-
-```bash
+   ```bash
    npm start
    ```
 
-The bot registers its slash commands in the server specified by `GUILD\\\\\\\\\\\\\\\_ID` whenever it starts.
+The bot registers its slash commands in the server specified by `GUILD_ID` whenever it starts.
 
-Commands
+> **Windows PowerShell note:** If PowerShell blocks `npm.ps1`, use `npm.cmd install` and `npm.cmd start` instead.
 
-Command	Description
+## Commands
 
-`/loldle classic`	Start a Classic game. Guesses show attribute comparisons.
+| Command | Description |
+| --- | --- |
+| `/loldle classic` | Start a Classic game. Guesses show attribute comparisons. |
+| `/loldle ability` | Guess the champion from a rotated, obscured ability image. |
+| `/loldle quote` | Guess the champion from a voice line and its text. |
+| `/loldle skin` | Guess the champion from a cropped splash image. |
+| `/g champion` | Submit a champion guess. |
+| `/hint` | Reveal the next hint for the current game mode. |
+| `/ff` | Vote to end the current game and reveal the answer. |
+| `/loldle stats [user]` | Show your stats or another member's stats. |
+| `/loldle board [scope] [mode] [sort] [top]` | Show the leaderboard. |
+| `/loldle setchannel channel` | Set the voice channel used for Quote mode audio. |
+| `/loldle list` | List players currently marked as active. |
+| `/loldle leave` | Remove yourself from the active player list. |
+| `/loldle zreset` | Reset your own statistics. |
 
-`/loldle ability`	Guess the champion from a rotated, obscured ability image.
+For `/loldle board`:
 
-`/loldle quote`	Guess the champion from a voice line and its text.
+- `scope`: `both`, `single`, or `multi`
+- `mode`: `all`, `classic`, `quote`, `ability`, or `skin`
+- `sort`: `wins`, `games`, or `winrate`
+- `top`: number of players to show (1–20)
 
-`/loldle skin`	Guess the champion from a cropped splash image.
+Win-rate rankings omit players with fewer than five recorded games.
 
-`/g champion`	Submit a champion guess.
+## Game modes
 
-`/hint`	Reveal the next hint for the current game mode.
+- **Classic:** Each guess is compared with the answer by gender, position, species, resource, attack type, region, and release year.
+- **Ability:** The starting image is rotated and grayscale. The first hint removes the rotation; the second reveals the original image.
+- **Quote:** The quote is shown when the game starts. Use `/hint` to play the audio; later hints reveal champion attributes. Set a voice channel with `/loldle setchannel` first.
+- **Skin:** The game starts with a small crop of a champion splash image. Each hint reveals a larger crop.
 
-`/ff`	Vote to end the current game and reveal the answer.
+The `/ff` command uses votes from active players. Players are added to the active list when they start or interact with a game. The list is cleared automatically once an hour. Players can also use `/loldle leave` to remove themselves.
 
-`/loldle stats \\\\\\\\\\\\\\\[user]`	Show your stats or another member's stats.
+## Data and scripts
 
-`/loldle board \\\\\\\\\\\\\\\[scope] \\\\\\\\\\\\\\\[mode] \\\\\\\\\\\\\\\[sort] \\\\\\\\\\\\\\\[top]`	Show the leaderboard.
+- `data/champions.json` contains champion attributes, ability image URLs, and skin image URLs.
+- `data/quoteCache.json` stores the text and audio URLs used by Quote mode.
+- `data/settings.json` stores each server's selected voice channel.
+- `data/stats.json` stores player statistics.
 
-`/loldle setchannel channel`	Set the voice channel used for Quote mode audio.
+Champion data is originally based on LoLdleData, with image assets hosted by Riot's Data Dragon. Quote data is collected from the League of Legends Wiki. Some newer champions are missing from the current quote data source; I plan to update it later.
 
-`/loldle list`	List players currently marked as active.
-
-`/loldle leave`	Remove yourself from the active player list.
-
-`/loldle zreset`	Reset your own statistics.
-
-For `/loldle board`, `scope` can be `both`, `single`, or `multi`; `mode` can be `all`, `classic`, `quote`, `ability`, or `skin`; `sort` can be `wins`, `games`, or `winrate`; and `top` controls how many players are shown (1–20). Win-rate rankings omit players with fewer than five recorded games.
-
-Game modes
-
-Classic: Each guess is compared with the answer by gender, position, species, resource, attack type, region, and release year.
-
-Ability: The starting image is rotated and grayscale. The first hint removes the rotation; the second reveals the original image.
-
-Quote: The quote is shown when the game starts. Use `/hint` to play the audio; later hints reveal champion attributes. Set a voice channel with `/loldle setchannel` first.
-
-Skin: The game starts with a small crop of a champion splash image. Each hint reveals a larger crop.
-
-The `/ff` command uses votes from active players. Players are added to the active list when they start or interact with a game. The list is cleared automatically once an hour; players can also use `/loldle leave` to remove themselves.
-
-Data and scripts
-
-`data/champions.json` contains champion attributes, ability image URLs, and skin image URLs.
-
-`data/quoteCache.json` stores the text and audio URLs used by Quote mode.
-
-`data/settings.json` stores each server's selected voice channel.
-
-`data/stats.json` stores player statistics.
-
-The project uses champion data originally based on LoLdleData, with image assets hosted by Riot's Data Dragon. Quote data is collected from the League of Legends Wiki. Side note i used the chud wiki so some later champions are not included. please bear with me for now i will change it later
-
-To update the local data:
+To update the local data, run:
 
 ```bash
 npm run update:skins
@@ -103,7 +90,7 @@ npm run update:quotes
 
 The skin script adds newly found skins to the existing champion data. The quote script fills missing quote-cache entries and keeps existing entries. Both scripts require an internet connection.
 
-Project structure
+## Project structure
 
 ```text
 .
@@ -115,7 +102,6 @@ Project structure
 └── package.json
 ```
 
-License and attribution
+## License and attribution
 
-The project is licensed under the ISC license. League of Legends names and assets belong to Riot Games; this project is unofficial and is not affiliated with or endorsed by Riot Games.
-
+The project is licensed under the ISC license. League of Legends names and assets belong to Riot Games. This project is unofficial and is not affiliated with or endorsed by Riot Games.
