@@ -79,7 +79,7 @@ The `/ff` command uses votes from active players. Players are added to the activ
 - `data/settings.json` stores each server's selected voice channel.
 - `data/stats.json` stores player statistics.
 
-Champion data is originally based on LoLdleData, with image assets hosted by Riot's Data Dragon. Quote data is collected from the League of Legends Wiki. Some newer champions are missing from the current quote data source; I plan to update it later.
+Champion data is originally based on LoLdleData, with image assets hosted by Riot's Data Dragon. Quote data is collected from the actively maintained [League of Legends Wiki](https://wiki.leagueoflegends.com) (the wiki.gg-hosted successor to the old Fandom wiki), which keeps newer champions up to date.
 
 To update the local data, run:
 
