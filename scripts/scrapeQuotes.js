@@ -9,34 +9,201 @@ const OUTPUT = path.join(
     "data",
     "quoteCache.json"
 );
+
+// The League of Legends Wiki moved from Fandom to wiki.gg and now lives at
+// wiki.leagueoflegends.com (actively maintained). It is still a MediaWiki, so
+// the parse API works the same way; the audio pages and file hosting differ.
+const WIKI_HOST = "https://wiki.leagueoflegends.com";
+const API = `${WIKI_HOST}/en-us/api.php`;
+
 const existingCache = fs.existsSync(OUTPUT)
     ? JSON.parse(fs.readFileSync(OUTPUT, "utf8"))
     : {};
 const cache = { ...existingCache };
 
+// Champion display name -> wiki page title.
 function wikiName(name) {
     return name
         .replace(/ /g, "_")
-        .replace(/'/g, "%27")
         .replace("_&_Willump", "");
 }
 
-async function fetchAudioPage(champion) {
+// Decode the handful of HTML entities that turn up in quote text and
+// file titles on the wiki.
+function decodeEntities(str) {
+    return str
+        .replace(/&quot;/g, '"')
+        .replace(/&#0*39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&");
+}
 
-    const page = `${wikiName(champion)}/LoL/Audio`;
+async function fetchAudioPage(championPage) {
 
     const url =
-        `https://leagueoflegends.fandom.com/api.php` +
+        `${API}` +
         `?action=parse` +
-        `&page=${page}` +
+        `&page=${encodeURIComponent(championPage)}` +
         `&prop=text` +
+        `&redirects=1` +
         `&formatversion=2` +
         `&format=json`;
 
     const res = await fetch(url);
     const data = await res.json();
 
+    if (data.error) {
+        return "";
+    }
+
     return data.parse?.text || "";
+}
+
+// Pull the direct .ogg URL out of a single <audio> element. The wiki lists the
+// playable .ogg source first and an .mp3 transcode second; we want the .ogg and
+// build an absolute URL from the relative src.
+function audioSource(audioBlock) {
+
+    const sources = [...audioBlock.matchAll(
+        /<source\b[^>]*\bsrc="([^"]+)"/g
+    )];
+
+    for (const s of sources) {
+
+        const src = s[1];
+
+        if (!src.includes(".ogg") || src.includes("/transcoded/")) {
+            continue;
+        }
+
+        return src.startsWith("http")
+            ? src
+            : WIKI_HOST + src;
+    }
+
+    return null;
+}
+
+// Drop everything from the "Trivia" and "Sound Effects" sections onward. Those
+// sections re-list audio clips next to unrelated prose, which would otherwise
+// get mis-paired with a clip. Matches the original scraper's cut-off intent.
+function trimToVoiceLines(html) {
+
+    const triviaPos = html.indexOf('id="Trivia"');
+    const sfxPos = html.indexOf('id="Sound_Effects"');
+
+    let cutPos = html.length;
+
+    if (triviaPos !== -1) {
+        cutPos = Math.min(cutPos, triviaPos);
+    }
+
+    if (sfxPos !== -1) {
+        cutPos = Math.min(cutPos, sfxPos);
+    }
+
+    return html.slice(0, cutPos);
+}
+
+// Extract a spoken line from the <i>...</i> that follows an audio clip, but
+// only within that clip's own list item (bounded by `limit`) so a clip without
+// a line of its own never borrows the next item's.
+function quoteFromItalic(html, fromPos, limit) {
+
+    const italicStart = html.indexOf("<i>", fromPos);
+
+    if (italicStart === -1 || italicStart >= limit) {
+        return null;
+    }
+
+    const italicEnd = html.indexOf("</i>", italicStart);
+
+    if (italicEnd === -1 || italicEnd > limit) {
+        return null;
+    }
+
+    const cleanText = decodeEntities(
+        html
+            .slice(italicStart + 3, italicEnd)
+            .replace(/<[^>]+>/g, "")
+    )
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const matches = [...cleanText.matchAll(/"([^"]+)"/g)];
+
+    if (matches.length === 0) {
+        return null;
+    }
+
+    const quote = matches
+        .map(m => m[1])
+        .join(" ")
+        .trim();
+
+    if (quote.split(/\s+/).length < 3) {
+        return null;
+    }
+
+    return quote;
+}
+
+// Walk the audio clips on a champion's page in order. Each clip carries a
+// data-mwtitle such as "Aatrox_Original_Taunt_0.ogg"; we keep the base
+// ("Original") voice lines plus the champion-select ("Select") and ban
+// ("Ban") lines, and pair each with the spoken line that follows it. Skin
+// recordings and sound effects are skipped, and each clip is kept only once.
+function parseQuotes(html) {
+
+    html = trimToVoiceLines(html);
+
+    const quotes = [];
+    const seen = new Set();
+
+    const audioRe =
+        /<audio\b[^>]*\bdata-mwtitle="([^"]*)"[\s\S]*?<\/audio>/g;
+
+    let match;
+
+    while ((match = audioRe.exec(html)) !== null) {
+
+        const title = match[1];
+
+        if (
+            !title.includes("_Original") &&
+            !title.includes("_Select") &&
+            !title.includes("_Ban")
+        ) {
+            continue;
+        }
+
+        const audio = audioSource(match[0]);
+
+        if (!audio || seen.has(audio)) {
+            continue;
+        }
+
+        const liEnd = html.indexOf("</li>", audioRe.lastIndex);
+        const limit = liEnd === -1 ? html.length : liEnd;
+
+        const quote = quoteFromItalic(html, audioRe.lastIndex, limit);
+
+        if (!quote) {
+            continue;
+        }
+
+        seen.add(audio);
+
+        quotes.push({
+            text: quote,
+            audio
+        });
+    }
+
+    return quotes;
 }
 
 (async () => {
@@ -50,170 +217,28 @@ async function fetchAudioPage(champion) {
             continue;
         }
 
-        console.log(`\n=== ${wikiName(champ.name)} ===`);
+        const page = `${wikiName(champ.name)}/Audio`;
+
+        console.log(`\n=== ${page} ===`);
 
         try {
 
-            let html = await fetchAudioPage(champ.name);
+            const html = await fetchAudioPage(page);
 
             if (!html) {
                 console.log("No page");
                 continue;
             }
 
-            const triviaPos = html.indexOf("Trivia");
-            const sfxPos = html.indexOf("Sound Effects");
-
-            let cutPos = html.length;
-
-            if (triviaPos !== -1) {
-                cutPos = Math.min(cutPos, triviaPos);
-            }
-
-            if (sfxPos !== -1) {
-                cutPos = Math.min(cutPos, sfxPos);
-            }
-
-            html = html.slice(0, cutPos);
-
-            const quotes = [];
-
-            const champToken =
-                "/" + wikiName(champ.name).toLowerCase();
-
-            let pos = 0;
-
-            while (true) {
-
-                const audioStart = html.indexOf(
-                    'href="https://static.wikia.nocookie.net/',
-                    pos
-                );
-
-                if (audioStart === -1) {
-                    break;
-                }
-
-                const urlStart = audioStart + 6;
-
-                const audioEnd = html.indexOf(
-                    '"',
-                    urlStart
-                );
-
-                if (audioEnd === -1) {
-                    break;
-                }
-
-                const audio = html.slice(
-                    urlStart,
-                    audioEnd
-                );
-
-                pos = audioEnd;
-
-                if (!audio.includes(".ogg")) {
-                    continue;
-                }
-
-                if (
-                    !audio
-                        .toLowerCase()
-                        .includes(champToken)
-                ) {
-                    continue;
-                }
-
-                if (
-                    !audio.includes("Original") &&
-                    !audio.includes("Select") &&
-                    !audio.includes("Ban")
-                ) {
-                    continue;
-                }
-
-                const italicStart =
-                    html.indexOf("<i>", pos);
-
-                if (italicStart === -1) {
-                    continue;
-                }
-
-                const italicEnd =
-                    html.indexOf(
-                        "</i>",
-                        italicStart
-                    );
-
-                if (italicEnd === -1) {
-                    continue;
-                }
-
-                pos = italicEnd;
-
-                const italicText = html
-                    .slice(
-                        italicStart + 3,
-                        italicEnd
-                    )
-                    .trim();
-
-                if (
-                    italicText.includes(
-                        "basic-tooltip"
-                    )
-                ) {
-                    continue;
-                }
-
-                const cleanText = italicText
-                    .replace(
-                        /<[^>]+>/g,
-                        ""
-                    )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-                const matches =
-                    [...cleanText.matchAll(
-                        /"([^"]+)"/g
-                    )];
-
-                if (matches.length === 0) {
-                    continue;
-                }
-
-                let quote = matches
-                    .map(m => m[1])
-                    .join(" ")
-                    .trim();
-
-                if (
-                    quote.split(/\s+/).length < 3
-                ) {
-                    continue;
-                }
-
-                quotes.push({
-                    text: quote,
-                    audio
-                });
-            }
+            const quotes = parseQuotes(html);
 
             cache[key] = quotes;
 
-            console.log(
-                `Saved ${quotes.length} quotes`
-            );
+            console.log(`Saved ${quotes.length} quotes`);
 
         } catch (err) {
 
-            console.log(
-                `FAILED: ${champ.name}`
-            );
+            console.log(`FAILED: ${champ.name}`);
 
             console.error(err);
         }
